@@ -52,12 +52,39 @@ Reads stdout streams directly from `ffmpeg` and `mkvmerge` to report exact progr
 
 4444 Downloader operates on a secure sandboxed communication channel:
 
-```mermaid
-graph TD
-  UI[React Frontend UI] -- IPC Commands --> Tauri[Tauri Rust Core]
-  Tauri -- Launches Sidecars --> Sidecars[aria2c / yt-dlp / ffmpeg / mkvmerge]
-  Sidecars -- Extracts Segments --> LocalDisk[Local Temp Storage]
-  LocalDisk -- Muxing & Containerizing --> FinalFile[Final Output Media File]
+```
+   ┌───────────────────────┐
+   │   React Frontend UI   │
+   └───────────┬───────────┘
+               │
+          IPC Commands
+               │
+               ▼
+   ┌───────────────────────┐
+   │    Tauri Rust Core    │
+   └───────────┬───────────┘
+               │
+       Launches Sidecars
+               │
+               ▼
+   ┌───────────────────────┐
+   │ aria2c / yt-dlp /     │
+   │ ffmpeg / mkvmerge     │
+   └───────────┬───────────┘
+               │
+       Extracts Segments
+               │
+               ▼
+   ┌───────────────────────┐
+   │  Local Temp Storage   │
+   └───────────┬───────────┘
+               │
+     Muxing & Containerizing
+               │
+               ▼
+   ┌───────────────────────┐
+   │   Final Output Media  │
+   └───────────────────────┘
 ```
 
 ---
