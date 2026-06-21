@@ -1,0 +1,67 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Download macOS Sidecars and Resources
+        run: |
+          mkdir -p src-tauri/bin
+          
+          echo "Downloading yt-dlp sidecars..."
+          curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos -o src-tauri/bin/yt-dlp-x86_64-apple-darwin
+          curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos -o src-tauri/bin/yt-dlp-aarch64-apple-darwin
+          chmod +x src-tauri/bin/yt-dlp-x86_64-apple-darwin
+          chmod +x src-tauri/bin/yt-dlp-aarch64-apple-darwin
+          
+          echo "Downloading ffmpeg resources..."
+          curl -L https://github.com/eugeneware/ffmpeg-static/releases/download/b5.1.2/darwin-x64 -o src-tauri/bin/ffmpeg
+          curl -L https://github.com/eugeneware/ffprobe-static/releases/download/b5.0.1/darwin-x64 -o src-tauri/bin/ffprobe
+          chmod +x src-tauri/bin/ffmpeg
+          chmod +x src-tauri/bin/ffprobe
+          
+          echo "Downloading aria2c resources..."
+          curl -L https://github.com/wenzhixin/aria2-static/raw/master/bin/darwin/aria2c -o src-tauri/bin/aria2c
+          chmod +x src-tauri/bin/aria2c
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: '4444 Downloader v__VERSION__'
+          releaseBody: '4444 Downloader V5 macOS Release. Note: This build is unsigned. Double-click or right-click to open and bypass macOS Gatekeeper.'
+          releaseDraft: true
+          prerelease: false

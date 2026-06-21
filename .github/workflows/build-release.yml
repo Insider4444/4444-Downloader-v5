@@ -1,0 +1,132 @@
+name: "4444-Downloader v5.2 — Build macOS"
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - "**.md"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: "Build · macOS (Apple Silicon)"
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Setup Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Download macOS binaries
+        run: |
+          set -e
+          mkdir -p src-tauri/bin
+
+          # yt-dlp — Tauri sidecar must be named yt-dlp-aarch64-apple-darwin
+          curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos" \
+               -o "src-tauri/bin/yt-dlp-aarch64-apple-darwin"
+          chmod +x "src-tauri/bin/yt-dlp-aarch64-apple-darwin"
+          echo "✅ yt-dlp"
+
+          # FFmpeg + FFprobe (evermeet.cx universal macOS static builds)
+          curl -fsSL "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip"  -o /tmp/ffmpeg.zip
+          curl -fsSL "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o /tmp/ffprobe.zip
+          unzip -o /tmp/ffmpeg.zip  -d /tmp/ff  && mv /tmp/ff/ffmpeg   src-tauri/bin/ffmpeg   && chmod +x src-tauri/bin/ffmpeg
+          unzip -o /tmp/ffprobe.zip -d /tmp/fp  && mv /tmp/fp/ffprobe  src-tauri/bin/ffprobe  && chmod +x src-tauri/bin/ffprobe
+          echo "✅ ffmpeg  ffprobe"
+
+          # aria2c + mkvmerge via Homebrew
+          brew install aria2 mkvtoolnix --quiet
+          cp "$(brew --prefix aria2)/bin/aria2c"        src-tauri/bin/aria2c   && chmod +x src-tauri/bin/aria2c
+          cp "$(brew --prefix mkvtoolnix)/bin/mkvmerge" src-tauri/bin/mkvmerge && chmod +x src-tauri/bin/mkvmerge
+          echo "✅ aria2c  mkvmerge"
+
+          echo "=== src-tauri/bin ==="
+          ls -lh src-tauri/bin/
+
+      - name: Build Tauri app
+        run: npm run tauri build -- --target aarch64-apple-darwin
+        env:
+          TAURI_PRIVATE_KEY: ""
+          TAURI_KEY_PASSWORD: ""
+
+      - name: Collect artifacts
+        id: artifacts
+        run: |
+          BUNDLE="src-tauri/target/aarch64-apple-darwin/release/bundle"
+          find "$BUNDLE" -type f | sort
+
+          DMG=$(find "$BUNDLE/dmg"   -name "*.dmg"  2>/dev/null | head -1 || true)
+          APP=$(find "$BUNDLE/macos" -name "*.app" -maxdepth 1 -type d 2>/dev/null | head -1 || true)
+          echo "dmg_path=$DMG" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$APP" ]; then
+            ZIP="4444-Downloader-v5.2-macOS-arm64.zip"
+            ditto -c -k --keepParent "$APP" "$ZIP"
+            echo "app_zip=$ZIP" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload DMG
+        if: steps.artifacts.outputs.dmg_path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: 4444-Downloader-v5.2-macOS-DMG
+          path: ${{ steps.artifacts.outputs.dmg_path }}
+          retention-days: 30
+
+      - name: Upload .app zip
+        if: steps.artifacts.outputs.app_zip != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: 4444-Downloader-v5.2-macOS-app
+          path: ${{ steps.artifacts.outputs.app_zip }}
+          retention-days: 30
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v5.2.${{ github.run_number }}"
+          name: "4444-Downloader v5.2 Build ${{ github.run_number }}"
+          body: |
+            ## 4444-Downloader V5.2 — macOS (Apple Silicon)
+            Built from commit `${{ github.sha }}` on `${{ github.ref_name }}`
+
+            > First launch: **right-click → Open** to bypass Gatekeeper.
+          files: |
+            ${{ steps.artifacts.outputs.dmg_path }}
+            ${{ steps.artifacts.outputs.app_zip }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## ✅ macOS Build Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "| | |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Target** | aarch64-apple-darwin |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Run** | ${{ github.run_number }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| **Artifact** | 4444-Downloader-v5.2-macOS-DMG |" >> "$GITHUB_STEP_SUMMARY"

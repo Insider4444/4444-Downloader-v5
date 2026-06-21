@@ -1,0 +1,21 @@
+[package]
+name = "app"
+version = "5.1.0"
+description = "4444 Downloader"
+authors = ["Bhargav"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "1", features = [] }
+
+[dependencies]
+tauri = { version = "1", features = ["path-all", "window-all", "shell-sidecar", "shell-execute", "shell-open", "fs-all", "dialog-all"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.11", features = ["json", "blocking"] }
+
+[features]
+# this feature is used for production builds or when `devPath` points to the filesystem
+# DO NOT REMOVE!!
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
