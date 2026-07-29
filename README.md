@@ -1,4 +1,4 @@
-# <p align="center">⚡ 4444 Downloader v5.1.0 ⚡</p>
+# <p align="center">⚡ 4444 Downloader v5.2.0 ⚡</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-red?style=for-the-badge&logo=windows" alt="Platform" />
